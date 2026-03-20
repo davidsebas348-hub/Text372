@@ -10,69 +10,58 @@ local timeOfDay = ReplicatedStorage:WaitForChild("GameInfo"):WaitForChild("TimeO
 local LocalPlayer = Players.LocalPlayer
 local weaponName = "Katana"
 
--- 🔥 estado toggle
-getgenv().AUTO_ATTACK = not getgenv().AUTO_ATTACK
+-- 🔥 evitar duplicar toggle si ya existe
+if getgenv().AUTO_ATTACK_LOADED then
+    return
+end
+getgenv().AUTO_ATTACK_LOADED = true
 
--- 🔥 guardar último rango usado
-getgenv().LAST_RANGE = getgenv().LAST_RANGE or 50
-getgenv().RANGE = getgenv().RANGE or getgenv().LAST_RANGE
+-- estado toggle
+getgenv().AUTO_ATTACK = false
 
--- si cambias RANGE desde afuera, se guarda automáticamente
+-- rango
+getgenv().RANGE = getgenv().RANGE or 50
+
+-- loop único
 task.spawn(function()
     while true do
-        task.wait(0.2)
-        if getgenv().RANGE and getgenv().RANGE > 0 then
-            getgenv().LAST_RANGE = getgenv().RANGE
+        task.wait(0.1)
+
+        if not getgenv().AUTO_ATTACK then
+            continue
         end
-    end
-end)
 
--- loop principal
-if getgenv().AUTO_ATTACK then
-    getgenv().AUTO_ATTACK_LOOP = task.spawn(function()
-        while getgenv().AUTO_ATTACK do
-            task.wait(0.1)
+        local range = getgenv().RANGE
 
-            local range = getgenv().RANGE
+        if not range or range <= 0 then
+            continue
+        end
 
-            if not range or range <= 0 then
-                continue
-            end
+        if timeOfDay.Value == "Day" then
+            continue
+        end
 
-            -- día = no atacar
-            if timeOfDay.Value == "Day" then
-                continue
-            end
+        local char = LocalPlayer.Character
+        if not char then continue end
 
-            local char = LocalPlayer.Character
-            if not char then continue end
+        local myRoot = char:FindFirstChild("HumanoidRootPart")
+        if not myRoot then continue end
 
-            local myRoot = char:FindFirstChild("HumanoidRootPart")
-            if not myRoot then continue end
+        for _, npc in pairs(enemiesFolder:GetChildren()) do
+            local humanoid = npc:FindFirstChildOfClass("Humanoid")
+            local root = npc:FindFirstChild("HumanoidRootPart")
 
-            for _, npc in pairs(enemiesFolder:GetChildren()) do
+            if humanoid and root and humanoid.Health > 0 then
+                local distance = (root.Position - myRoot.Position).Magnitude
 
-                local humanoid = npc:FindFirstChildOfClass("Humanoid")
-                local root = npc:FindFirstChild("HumanoidRootPart")
-
-                if humanoid and root and humanoid.Health > 0 then
-
-                    local distance = (root.Position - myRoot.Position).Magnitude
-
-                    if distance <= range then
-                        damageRemote:FireServer(
-                            humanoid,
-                            weaponName,
-                            root.Position
-                        )
-                    end
-
+                if distance <= range then
+                    damageRemote:FireServer(
+                        humanoid,
+                        weaponName,
+                        root.Position
+                    )
                 end
             end
         end
-    end)
-
-else
-    -- apagar loop
-    getgenv().AUTO_ATTACK = false
-end
+    end
+end)
